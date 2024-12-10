@@ -1,0 +1,261 @@
+<!-- Spara denna fil som index.html -->
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enkäthantering</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.7/axios.min.js"></script>
+</head>
+<body class="bg-gray-100">
+    <!-- Navigering -->
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex justify-between">
+                <div class="flex space-x-7">
+                    <div>
+                        <a href="#" class="flex items-center py-4 px-2">
+                            <span class="font-semibold text-gray-500 text-lg">EnkätPortalen</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <a href="#" class="py-2 px-4 font-medium text-gray-500 rounded hover:bg-gray-100 hover:text-gray-900">Hem</a>
+                    <a href="#surveys" class="py-2 px-4 font-medium text-gray-500 rounded hover:bg-gray-100 hover:text-gray-900">Enkäter</a>
+                    <button id="loginBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Logga in</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero sektion för ej inloggade -->
+    <div id="heroSection" class="bg-white h-screen flex flex-col justify-center items-center px-4">
+        <h1 class="text-4xl font-bold text-gray-800 mb-4 text-center">Välkommen till EnkätPortalen</h1>
+        <p class="text-xl text-gray-600 text-center mb-8">Skapa och hantera enkäter enkelt och effektivt</p>
+        <div class="space-x-4">
+            <button onclick="showLogin()" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 transition duration-200">Logga in</button>
+        </div>
+    </div>
+
+    <!-- Login Form -->
+    <div id="loginForm" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center">
+        <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
+            <h2 class="text-2xl font-bold mb-4">Logga in</h2>
+            <input type="text" id="username" placeholder="GitHub användarnamn" class="w-full p-2 border rounded mb-4">
+            <input type="password" id="token" placeholder="GitHub Personal Access Token" class="w-full p-2 border rounded mb-4">
+            <div class="flex justify-between">
+                <button onclick="login()" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">Logga in</button>
+                <button onclick="hideLogin()" class="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="adminPanel" class="hidden max-w-6xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Mina Enkäter</h2>
+                <button onclick="showNewSurveyForm()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Ny Enkät
+                </button>
+            </div>
+            <div id="surveyList" class="space-y-4">
+                <!-- Enkäter listas här -->
+            </div>
+        </div>
+    </div>
+
+    <!-- New Survey Form -->
+    <div id="newSurveyForm" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex justify-center items-center">
+        <div class="bg-white p-8 rounded-lg shadow-xl max-w-md w-full">
+            <h2 class="text-2xl font-bold mb-4">Skapa ny enkät</h2>
+            <input type="text" id="surveyTitle" placeholder="Enkättitel" class="w-full p-2 border rounded mb-4">
+            <textarea id="surveyDescription" placeholder="Beskrivning" class="w-full p-2 border rounded mb-4" rows="3"></textarea>
+            <div class="flex justify-between">
+                <button onclick="createSurvey()" class="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600">Skapa</button>
+                <button onclick="hideNewSurveyForm()" class="bg-gray-300 text-gray-700 px-6 py-2 rounded hover:bg-gray-400">Avbryt</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Globala variabler
+        let currentUser = null;
+        let githubToken = null;
+
+        // UI Functions
+        function showLogin() {
+            document.getElementById('loginForm').classList.remove('hidden');
+        }
+
+        function hideLogin() {
+            document.getElementById('loginForm').classList.add('hidden');
+        }
+
+        function showNewSurveyForm() {
+            document.getElementById('newSurveyForm').classList.remove('hidden');
+        }
+
+        function hideNewSurveyForm() {
+            document.getElementById('newSurveyForm').classList.add('hidden');
+        }
+
+        // Authentication
+        async function login() {
+            const username = document.getElementById('username').value;
+            const token = document.getElementById('token').value;
+
+            if (!username || !token) {
+                alert('Fyll i både användarnamn och token');
+                return;
+            }
+
+            currentUser = username;
+            githubToken = token;
+
+            try {
+                await loadSurveys();
+                document.getElementById('heroSection').classList.add('hidden');
+                document.getElementById('adminPanel').classList.remove('hidden');
+                document.getElementById('loginForm').classList.add('hidden');
+                document.getElementById('loginBtn').textContent = 'Logga ut';
+                document.getElementById('loginBtn').onclick = logout;
+            } catch (error) {
+                alert('Inloggning misslyckades. Kontrollera dina uppgifter.');
+                console.error('Login error:', error);
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            githubToken = null;
+            document.getElementById('heroSection').classList.remove('hidden');
+            document.getElementById('adminPanel').classList.add('hidden');
+            document.getElementById('loginBtn').textContent = 'Logga in';
+            document.getElementById('loginBtn').onclick = showLogin;
+        }
+
+        // Survey Management
+        async function loadSurveys() {
+            try {
+                const response = await axios.get(`https://api.github.com/repos/${currentUser}/${currentUser}.github.io/contents/surveys.json`, {
+                    headers: {
+                        'Authorization': `token ${githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                let surveys = [];
+                if (response.data && response.data.content) {
+                    const content = atob(response.data.content);
+                    surveys = JSON.parse(content);
+                }
+
+                displaySurveys(surveys);
+            } catch (error) {
+                if (error.response && error.response.status === 404) {
+                    // Om filen inte finns, skapa den
+                    await createSurveysFile();
+                    displaySurveys([]);
+                } else {
+                    console.error('Error loading surveys:', error);
+                }
+            }
+        }
+
+        async function createSurveysFile() {
+            const content = btoa(JSON.stringify([]));
+            await axios.put(
+                `https://api.github.com/repos/${currentUser}/${currentUser}.github.io/contents/surveys.json`,
+                {
+                    message: 'Create surveys.json',
+                    content: content
+                },
+                {
+                    headers: {
+                        'Authorization': `token ${githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                }
+            );
+        }
+
+        function displaySurveys(surveys) {
+            const surveyList = document.getElementById('surveyList');
+            surveyList.innerHTML = '';
+
+            surveys.forEach(survey => {
+                const surveyElement = document.createElement('div');
+                surveyElement.className = 'bg-gray-50 p-4 rounded border';
+                surveyElement.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-semibold">${survey.title}</h3>
+                            <p class="text-gray-600">${survey.description}</p>
+                        </div>
+                        <div class="space-x-2">
+                            <button class="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">Redigera</button>
+                            <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Ta bort</button>
+                        </div>
+                    </div>
+                `;
+                surveyList.appendChild(surveyElement);
+            });
+        }
+
+        async function createSurvey() {
+            const title = document.getElementById('surveyTitle').value;
+            const description = document.getElementById('surveyDescription').value;
+
+            if (!title) {
+                alert('Ange en titel för enkäten');
+                return;
+            }
+
+            try {
+                const response = await axios.get(`https://api.github.com/repos/${currentUser}/${currentUser}.github.io/contents/surveys.json`, {
+                    headers: {
+                        'Authorization': `token ${githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                let surveys = [];
+                if (response.data && response.data.content) {
+                    const content = atob(response.data.content);
+                    surveys = JSON.parse(content);
+                }
+
+                surveys.push({
+                    id: Date.now(),
+                    title,
+                    description,
+                    created: new Date().toISOString()
+                });
+
+                await axios.put(
+                    `https://api.github.com/repos/${currentUser}/${currentUser}.github.io/contents/surveys.json`,
+                    {
+                        message: 'Add new survey',
+                        content: btoa(JSON.stringify(surveys)),
+                        sha: response.data.sha
+                    },
+                    {
+                        headers: {
+                            'Authorization': `token ${githubToken}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }
+                );
+
+                hideNewSurveyForm();
+                await loadSurveys();
+            } catch (error) {
+                console.error('Error creating survey:', error);
+                alert('Det gick inte att skapa enkäten. Försök igen.');
+            }
+        }
+    </script>
+</body>
+</html>
